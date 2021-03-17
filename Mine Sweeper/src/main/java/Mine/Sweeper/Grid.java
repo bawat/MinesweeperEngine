@@ -1,19 +1,19 @@
 package Mine.Sweeper;
 
-import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
-import dev.morphia.annotations.Entity;
-import dev.morphia.annotations.Reference;
+import dev.morphia.Datastore;
 import lombok.Getter;
+import lombok.SneakyThrows;
 
-@Entity
 public class Grid {
-	@Reference
-	protected HashMap<Point2D, Cell> map = new HashMap<Point2D, Cell>();
+	protected HashMap<Point, Cell> map = new HashMap<Point, Cell>();
 	@Getter
 	private int width, height;
 	
@@ -22,8 +22,12 @@ public class Grid {
 		this.height = height;
 		for(int y = 0; y < height; y++) {
 			for(int x = 0; x < width; x++) {
-				Point2D point = new Point2D.Double(x,  y); 
-				map.put(point, new Cell(point, this));
+				Point point = new Point().set(x,  y); 
+				map.put(point, new Cell.Builder()
+									.setPosition(point)
+									.setParent(this)
+									.build()
+						);
 			}
 		}
 		addBombs(bombs);
@@ -37,15 +41,18 @@ public class Grid {
 			value.setBomb(true);
 		}
 	}
+	private int countBombs() {
+		return (int) map.values().stream().filter(Cell::isBomb).count();
+	}
 	
-	public void revealCell(Point2D point) {
+	public void revealCell(Point point) {
 		if(!map.containsKey(point)) return;
 		map.get(point).setRevealed(true);
 		
 		revealingSurroundingCells(point);
 	}
 	
-	private void revealingSurroundingCells(Point2D point){
+	private void revealingSurroundingCells(Point point){
 		Cell cell = map.get(point);
 		cell.getSurroundingCells().stream()
 			.filter(e -> !e.isRevealed())
@@ -59,12 +66,12 @@ public class Grid {
 	public void drawToConsole() {
 		String b = ""
 		+ "#".repeat(getWidth()) + System.lineSeparator()
-		+ "Here is your Minesweeper:" + System.lineSeparator()
+		+ "Number of bombs: " + countBombs() + System.lineSeparator()
 		+ "#".repeat(getWidth()) + System.lineSeparator();
 
 		for(int y = 0; y < getHeight(); y++) {
 			for(int x = 0; x < getWidth(); x++) {
-				b += map.get(new Point2D.Double(x, y));
+				b += map.get(new Point().set(x,y));
 			}
 			b += System.lineSeparator();
 		}
@@ -82,5 +89,31 @@ public class Grid {
 	}
 	public boolean gameWon() {
 		return map.values().stream().allMatch(e -> e.isBomb() ^ e.isRevealed());
+	}
+
+	@SneakyThrows
+	public ThreadPoolExecutor uploadAsync(Datastore datastore) {
+		ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+		for(Cell cell : map.values()) {
+			executor.execute(new Runnable() {
+				@Override
+				public void run() {
+					datastore.save(cell);
+				}
+			});
+		}
+		executor.shutdown();
+		return executor;
+	}
+	@SneakyThrows
+	public void uploadSync(Datastore datastore) {
+		uploadAsync(datastore).awaitTermination(30, TimeUnit.SECONDS);
+	}
+	public void download(Datastore datastore) {
+		map.clear();
+		for(Cell cell : datastore.createQuery(Cell.class).find().toList()) {
+			Cell newCell = new Cell.Builder(cell).setParent(this).build();
+			map.put(newCell.getPosition(), newCell);
+		}
 	}
 }
