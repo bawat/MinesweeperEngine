@@ -75,7 +75,7 @@ public class Cell {
 		while (surroundingCells.remove(null));
 		return surroundingCells;
 	}
-	protected int getNumberOfBombsSurroundingCell() {
+	public int getNumberOfBombsSurroundingCell() {
 		return (int) getSurroundingCells().stream().filter(Objects::nonNull).filter(Cell::isBomb).count();
 	}
 }

@@ -13,7 +13,7 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 
 public class Grid {
-	protected HashMap<Point, Cell> map = new HashMap<Point, Cell>();
+	public HashMap<Point, Cell> map = new HashMap<Point, Cell>();
 	@Getter
 	private int width, height;
 	
@@ -41,7 +41,7 @@ public class Grid {
 			value.setBomb(true);
 		}
 	}
-	private int countBombs() {
+	public int countBombs() {
 		return (int) map.values().stream().filter(Cell::isBomb).count();
 	}
 	
@@ -61,24 +61,6 @@ public class Grid {
 				e.setRevealed(true);
 				if(e.getNumberOfBombsSurroundingCell() == 0) revealingSurroundingCells(e.getPosition());
 			});
-	}
-	
-	public void drawToConsole() {
-		String b = ""
-		+ "#".repeat(getWidth()) + System.lineSeparator()
-		+ "Number of bombs: " + countBombs() + System.lineSeparator()
-		+ "#".repeat(getWidth()) + System.lineSeparator();
-
-		for(int y = 0; y < getHeight(); y++) {
-			for(int x = 0; x < getWidth(); x++) {
-				b += map.get(new Point().set(x,y));
-			}
-			b += System.lineSeparator();
-		}
-		
-		b += "#".repeat(getWidth()) + System.lineSeparator();
-		
-		System.out.println(b);
 	}
 
 	public boolean gameIsntOver() {
